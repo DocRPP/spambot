@@ -1,0 +1,44 @@
+.wp-spambot-admin {
+    padding: 20px;
+}
+
+#wp-spambot-user-management .column-cb {
+    width: 2.5em;
+}
+
+#wp-spambot-user-management .column-username {
+    width: 15%;
+}
+
+#wp-spambot-user-management .column-email {
+    width: 20%;
+}
+
+#wp-spambot-user-management .column-registered {
+    width: 15%;
+}
+
+#wp-spambot-user-management .column-posts {
+    width: 10%;
+}
+
+#wp-spambot-user-management .column-role {
+    width: 15%;
+}
+
+#wp-spambot-user-management .column-spam-status {
+    width: 20%;
+}
+
+.wp-spambot-status-flagged {
+    color: #dc3232;
+    font-weight: bold;
+}
+
+.wp-spambot-status-clean {
+    color: #46b450;
+}
+
+.wp-spambot-status-unknown {
+    color: #999;
+}
