@@ -1,0 +1,31 @@
+# WordPress specific
+wp-config.php
+wp-content/uploads/
+wp-content/cache/
+wp-content/backup-db/
+wp-content/backups/
+wp-content/blogs.dir/
+wp-content/upgrade/
+wp-content/backup-db/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Dependencies & Build
+node_modules/
+vendor/
+composer.phar
+composer.lock
+package-lock.json
+
+# Logs
+*.log
+error_log
+debug.log
