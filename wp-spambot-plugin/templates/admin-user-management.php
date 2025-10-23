@@ -2,10 +2,90 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+
+if (!function_exists('wp_spambot_sortable_column')) {
+    function wp_spambot_sortable_column($column, $label, $current_orderby, $current_order) {
+        $new_order = 'ASC';
+        $arrow = '';
+        
+        if ($column === $current_orderby) {
+            $new_order = ($current_order === 'ASC') ? 'DESC' : 'ASC';
+            $arrow = ($current_order === 'ASC') ? ' ▲' : ' ▼';
+        }
+        
+        $url = add_query_arg(array(
+            'orderby' => $column,
+            'order' => $new_order,
+        ));
+        
+        return sprintf(
+            '<a href="%s">%s%s</a>',
+            esc_url($url),
+            esc_html($label),
+            esc_html($arrow)
+        );
+    }
+}
 ?>
 <div class="wrap">
     <h1><?php esc_html_e('User Management - Spam Detection', 'wp-spambot'); ?></h1>
     <p><?php esc_html_e('Select users and perform bulk operations to check for spam, flag, or delete spam accounts.', 'wp-spambot'); ?></p>
+    
+    <form method="get" action="">
+        <input type="hidden" name="page" value="wp_spambot" />
+        <div class="wp-spambot-filters">
+            <div class="filter-group">
+                <label for="filter-role"><?php esc_html_e('Role', 'wp-spambot'); ?></label>
+                <select name="filter_role" id="filter-role">
+                    <option value=""><?php esc_html_e('All Roles', 'wp-spambot'); ?></option>
+                    <?php
+                    global $wp_roles;
+                    if (!isset($wp_roles)) {
+                        $wp_roles = wp_roles();
+                    }
+                    foreach ($wp_roles->roles as $role_key => $role_data) :
+                        $selected = selected($filter_role, $role_key, false);
+                        ?>
+                        <option value="<?php echo esc_attr($role_key); ?>" <?php echo $selected; ?>><?php echo esc_html($role_data['name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filter-posts-min"><?php esc_html_e('Min Posts', 'wp-spambot'); ?></label>
+                <input type="number" name="filter_posts_min" id="filter-posts-min" value="<?php echo esc_attr($filter_posts_min); ?>" min="0" />
+            </div>
+            <div class="filter-group">
+                <label for="filter-posts-max"><?php esc_html_e('Max Posts', 'wp-spambot'); ?></label>
+                <input type="number" name="filter_posts_max" id="filter-posts-max" value="<?php echo esc_attr($filter_posts_max); ?>" min="0" />
+            </div>
+            <div class="filter-group">
+                <label for="filter-spam-status"><?php esc_html_e('Spam Status', 'wp-spambot'); ?></label>
+                <select name="filter_spam_status" id="filter-spam-status">
+                    <option value=""><?php esc_html_e('All', 'wp-spambot'); ?></option>
+                    <option value="flagged" <?php selected($filter_spam_status, 'flagged'); ?>><?php esc_html_e('Flagged', 'wp-spambot'); ?></option>
+                    <option value="clean" <?php selected($filter_spam_status, 'clean'); ?>><?php esc_html_e('Clean', 'wp-spambot'); ?></option>
+                    <option value="unchecked" <?php selected($filter_spam_status, 'unchecked'); ?>><?php esc_html_e('Not Checked', 'wp-spambot'); ?></option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filter-spam-reason"><?php esc_html_e('Spam Reason', 'wp-spambot'); ?></label>
+                <select name="filter_spam_reason" id="filter-spam-reason">
+                    <option value=""><?php esc_html_e('All', 'wp-spambot'); ?></option>
+                    <option value="email_only" <?php selected($filter_spam_reason, 'email_only'); ?>><?php esc_html_e('Email Only', 'wp-spambot'); ?></option>
+                    <option value="username_only" <?php selected($filter_spam_reason, 'username_only'); ?>><?php esc_html_e('Username Only', 'wp-spambot'); ?></option>
+                    <option value="both" <?php selected($filter_spam_reason, 'both'); ?>><?php esc_html_e('Email & Username', 'wp-spambot'); ?></option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="per-page"><?php esc_html_e('Users Per Page', 'wp-spambot'); ?></label>
+                <input type="number" name="per_page" id="per-page" value="<?php echo esc_attr($users_per_page); ?>" min="1" max="500" />
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="button button-primary"><?php esc_html_e('Apply Filters', 'wp-spambot'); ?></button>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=wp_spambot')); ?>" class="button"><?php esc_html_e('Reset', 'wp-spambot'); ?></a>
+            </div>
+        </div>
+    </form>
     
     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" id="wp-spambot-user-management">
         <?php wp_nonce_field('wp_spambot_bulk_action'); ?>
@@ -30,12 +110,12 @@ if (!defined('ABSPATH')) {
                     <td class="manage-column column-cb check-column">
                         <input type="checkbox" id="select-all-users" />
                     </td>
-                    <th scope="col" class="manage-column column-username"><?php esc_html_e('Username', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-email"><?php esc_html_e('Email', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-registered"><?php esc_html_e('Registered', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-posts"><?php esc_html_e('Posts', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-role"><?php esc_html_e('Role', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-spam-status"><?php esc_html_e('Spam Status', 'wp-spambot'); ?></th>
+                    <th scope="col" class="manage-column column-username"><?php echo wp_spambot_sortable_column('username', __('Username', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-email"><?php echo wp_spambot_sortable_column('email', __('Email', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-registered"><?php echo wp_spambot_sortable_column('registered', __('Registered', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-posts"><?php echo wp_spambot_sortable_column('posts', __('Posts', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-role"><?php echo wp_spambot_sortable_column('role', __('Role', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-spam-status"><?php echo wp_spambot_sortable_column('spam_status', __('Spam Status', 'wp-spambot'), $orderby, $order); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -150,12 +230,12 @@ if (!defined('ABSPATH')) {
                     <td class="manage-column column-cb check-column">
                         <input type="checkbox" id="select-all-users-bottom" />
                     </td>
-                    <th scope="col" class="manage-column column-username"><?php esc_html_e('Username', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-email"><?php esc_html_e('Email', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-registered"><?php esc_html_e('Registered', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-posts"><?php esc_html_e('Posts', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-role"><?php esc_html_e('Role', 'wp-spambot'); ?></th>
-                    <th scope="col" class="manage-column column-spam-status"><?php esc_html_e('Spam Status', 'wp-spambot'); ?></th>
+                    <th scope="col" class="manage-column column-username"><?php echo wp_spambot_sortable_column('username', __('Username', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-email"><?php echo wp_spambot_sortable_column('email', __('Email', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-registered"><?php echo wp_spambot_sortable_column('registered', __('Registered', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-posts"><?php echo wp_spambot_sortable_column('posts', __('Posts', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-role"><?php echo wp_spambot_sortable_column('role', __('Role', 'wp-spambot'), $orderby, $order); ?></th>
+                    <th scope="col" class="manage-column column-spam-status"><?php echo wp_spambot_sortable_column('spam_status', __('Spam Status', 'wp-spambot'), $orderby, $order); ?></th>
                 </tr>
             </tfoot>
         </table>

@@ -66,23 +66,159 @@ class WP_Spambot_Admin {
             return;
         }
         
+        $settings = get_option('wp_spambot_settings', array());
+        $default_per_page = isset($settings['users_per_page']) ? intval($settings['users_per_page']) : 20;
+        
         $paged = isset($_GET['paged']) ? absint($_GET['paged']) : 1;
-        $users_per_page = 20;
+        $users_per_page = isset($_GET['per_page']) ? absint($_GET['per_page']) : $default_per_page;
+        $users_per_page = max(1, min(500, $users_per_page));
         $offset = ($paged - 1) * $users_per_page;
+        
+        $orderby = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'registered';
+        $order = isset($_GET['order']) && in_array(strtoupper($_GET['order']), array('ASC', 'DESC')) ? strtoupper($_GET['order']) : 'DESC';
+        
+        $filter_role = isset($_GET['filter_role']) ? sanitize_text_field($_GET['filter_role']) : '';
+        $filter_spam_status = isset($_GET['filter_spam_status']) ? sanitize_text_field($_GET['filter_spam_status']) : '';
+        $filter_spam_reason = isset($_GET['filter_spam_reason']) ? sanitize_text_field($_GET['filter_spam_reason']) : '';
+        $filter_posts_min = isset($_GET['filter_posts_min']) ? absint($_GET['filter_posts_min']) : '';
+        $filter_posts_max = isset($_GET['filter_posts_max']) ? absint($_GET['filter_posts_max']) : '';
         
         $args = array(
             'number' => $users_per_page,
             'offset' => $offset,
-            'orderby' => 'registered',
-            'order' => 'DESC',
+            'orderby' => $this->get_orderby_field($orderby),
+            'order' => $order,
         );
         
+        if (!empty($filter_role)) {
+            $args['role'] = $filter_role;
+        }
+        
+        $meta_query = array();
+        
+        if (!empty($filter_spam_status)) {
+            if ($filter_spam_status === 'flagged') {
+                $meta_query[] = array(
+                    'key' => 'wp_spambot_is_flagged',
+                    'value' => '1',
+                    'compare' => '='
+                );
+            } elseif ($filter_spam_status === 'clean') {
+                $meta_query[] = array(
+                    'key' => 'wp_spambot_is_flagged',
+                    'value' => '0',
+                    'compare' => '='
+                );
+                $meta_query[] = array(
+                    'key' => 'wp_spambot_status',
+                    'compare' => 'EXISTS'
+                );
+            } elseif ($filter_spam_status === 'unchecked') {
+                $meta_query[] = array(
+                    'key' => 'wp_spambot_status',
+                    'compare' => 'NOT EXISTS'
+                );
+            }
+        }
+        
+        $apply_reason_filter = !empty($filter_spam_reason) && $filter_spam_status !== 'unchecked';
+        if ($apply_reason_filter) {
+            if ($filter_spam_reason === 'email_only') {
+                $meta_query[] = array(
+                    'relation' => 'AND',
+                    array(
+                        'key' => 'wp_spambot_flag_email',
+                        'value' => '1',
+                        'compare' => '='
+                    ),
+                    array(
+                        'key' => 'wp_spambot_flag_username',
+                        'value' => '0',
+                        'compare' => '='
+                    )
+                );
+            } elseif ($filter_spam_reason === 'username_only') {
+                $meta_query[] = array(
+                    'relation' => 'AND',
+                    array(
+                        'key' => 'wp_spambot_flag_username',
+                        'value' => '1',
+                        'compare' => '='
+                    ),
+                    array(
+                        'key' => 'wp_spambot_flag_email',
+                        'value' => '0',
+                        'compare' => '='
+                    )
+                );
+            } elseif ($filter_spam_reason === 'both') {
+                $meta_query[] = array(
+                    'relation' => 'AND',
+                    array(
+                        'key' => 'wp_spambot_flag_email',
+                        'value' => '1',
+                        'compare' => '='
+                    ),
+                    array(
+                        'key' => 'wp_spambot_flag_username',
+                        'value' => '1',
+                        'compare' => '='
+                    )
+                );
+            }
+        }
+        
+        if (!empty($meta_query)) {
+            $meta_query['relation'] = 'AND';
+            $args['meta_query'] = $meta_query;
+        }
+        
         $user_query = new WP_User_Query($args);
-        $total_users = $user_query->get_total();
-        $total_pages = ceil($total_users / $users_per_page);
         $users = $user_query->get_results();
         
+        if (!empty($filter_posts_min) || !empty($filter_posts_max)) {
+            $users = array_filter($users, function($user) use ($filter_posts_min, $filter_posts_max) {
+                $post_count = count_user_posts($user->ID);
+                if (!empty($filter_posts_min) && $post_count < $filter_posts_min) {
+                    return false;
+                }
+                if (!empty($filter_posts_max) && $post_count > $filter_posts_max) {
+                    return false;
+                }
+                return true;
+            });
+        }
+        
+        if ($orderby === 'posts') {
+            usort($users, function($a, $b) use ($order) {
+                $count_a = count_user_posts($a->ID);
+                $count_b = count_user_posts($b->ID);
+                if ($order === 'ASC') {
+                    return $count_a - $count_b;
+                } else {
+                    return $count_b - $count_a;
+                }
+            });
+        }
+        
+        $total_users = $user_query->get_total();
+        $total_pages = ceil($total_users / $users_per_page);
+        
+        $current_url = remove_query_arg(array('paged'));
+        
         include WP_SPAMBOT_PLUGIN_DIR . 'templates/admin-user-management.php';
+    }
+    
+    protected function get_orderby_field($orderby) {
+        $allowed = array(
+            'username' => 'user_login',
+            'email' => 'user_email',
+            'registered' => 'registered',
+            'role' => 'display_name',
+            'posts' => 'ID'
+        );
+        
+        return isset($allowed[$orderby]) ? $allowed[$orderby] : 'registered';
     }
     
     public function render_settings_page() {
@@ -154,6 +290,7 @@ class WP_Spambot_Admin {
                     'confidence' => $response['confidence'],
                     'frequency' => $response['frequency'],
                     'details' => $response['details'],
+                    'factors' => isset($response['factors']) ? $response['factors'] : array(),
                     'last_checked' => current_time('mysql'),
                 ));
                 $results['flagged']++;
@@ -164,10 +301,16 @@ class WP_Spambot_Admin {
                     'confidence' => $response['confidence'],
                     'frequency' => $response['frequency'],
                     'details' => $response['details'],
+                    'factors' => isset($response['factors']) ? $response['factors'] : array(),
                     'last_checked' => current_time('mysql'),
                 ));
                 $results['clean']++;
             }
+            $email_factor = !empty($response['factors']['email']);
+            $username_factor = !empty($response['factors']['username']);
+            update_user_meta($user_id, 'wp_spambot_is_flagged', $response['is_spam'] ? 1 : 0);
+            update_user_meta($user_id, 'wp_spambot_flag_email', $email_factor ? 1 : 0);
+            update_user_meta($user_id, 'wp_spambot_flag_username', $username_factor ? 1 : 0);
         }
         
         $this->add_admin_notice(
@@ -187,8 +330,14 @@ class WP_Spambot_Admin {
                 'status' => 'flagged',
                 'service' => 'manual',
                 'confidence' => null,
+                'frequency' => null,
+                'details' => array(),
+                'factors' => array('email' => false, 'username' => false),
                 'last_checked' => current_time('mysql'),
             ));
+            update_user_meta($user_id, 'wp_spambot_is_flagged', 1);
+            update_user_meta($user_id, 'wp_spambot_flag_email', 0);
+            update_user_meta($user_id, 'wp_spambot_flag_username', 0);
         }
         $this->add_admin_notice(__('Selected users have been flagged as spam.', 'wp-spambot'), 'success');
     }

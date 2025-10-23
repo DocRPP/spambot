@@ -42,3 +42,35 @@
 .wp-spambot-status-unknown {
     color: #999;
 }
+
+.wp-spambot-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+}
+
+.wp-spambot-filters .filter-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.wp-spambot-filters .filter-group label {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.wp-spambot-filters .filter-group input,
+.wp-spambot-filters .filter-group select {
+    min-width: 160px;
+}
+
+.wp-spambot-filters .filter-actions {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+}

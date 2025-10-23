@@ -43,6 +43,11 @@ function wp_spambot_activate() {
         'stopforumspam_enabled' => false,
         'stopforumspam_api_key' => '',
         'stopforumspam_threshold' => 1,
+        'users_per_page' => 20,
+        'stopforumspam_registration_enabled' => false,
+        'stopforumspam_registration_confidence' => 95,
+        'trusted_email_only_enabled' => false,
+        'trusted_email_providers' => array(),
     );
     
     if (!get_option('wp_spambot_settings')) {
