@@ -325,7 +325,15 @@ class WP_Spambot_Admin {
     }
     
     protected function bulk_flag_spam($user_ids) {
+        $reported_count = 0;
+        $report_failures = array();
+        
         foreach ($user_ids as $user_id) {
+            $user = get_user_by('id', $user_id);
+            if (!$user) {
+                continue;
+            }
+            
             update_user_meta($user_id, 'wp_spambot_status', array(
                 'status' => 'flagged',
                 'service' => 'manual',
@@ -338,8 +346,50 @@ class WP_Spambot_Admin {
             update_user_meta($user_id, 'wp_spambot_is_flagged', 1);
             update_user_meta($user_id, 'wp_spambot_flag_email', 0);
             update_user_meta($user_id, 'wp_spambot_flag_username', 0);
+            
+            $result = $this->spam_service->report_spam_to_stopforumspam($user);
+            if ($result['success']) {
+                $reported_count++;
+            } else {
+                $report_failures[] = array(
+                    'user' => $user->user_login,
+                    'message' => isset($result['message']) ? $result['message'] : __('Unknown error while reporting to StopForumSpam.', 'wp-spambot'),
+                );
+            }
         }
-        $this->add_admin_notice(__('Selected users have been flagged as spam.', 'wp-spambot'), 'success');
+        
+        $message = sprintf(
+            __('Selected users have been flagged as spam. %1$d reported to StopForumSpam.', 'wp-spambot'),
+            $reported_count
+        );
+        
+        $this->add_admin_notice($message, 'success');
+        
+        if (!empty($report_failures)) {
+            $failure_count = count($report_failures);
+            $failure_summaries = array();
+            foreach (array_slice($report_failures, 0, 3) as $failure) {
+                $failure_summaries[] = sprintf(
+                    __('%1$s (%2$s)', 'wp-spambot'),
+                    $failure['user'],
+                    $failure['message']
+                );
+            }
+            if ($failure_count > 3) {
+                $failure_summaries[] = sprintf(__('and %d more', 'wp-spambot'), $failure_count - 3);
+            }
+            $error_message = sprintf(
+                _n(
+                    'Could not report %1$d user to StopForumSpam: %2$s',
+                    'Could not report %1$d users to StopForumSpam: %2$s',
+                    $failure_count,
+                    'wp-spambot'
+                ),
+                $failure_count,
+                implode('; ', $failure_summaries)
+            );
+            $this->add_admin_notice($error_message, 'warning');
+        }
     }
     
     protected function bulk_delete_users($user_ids) {

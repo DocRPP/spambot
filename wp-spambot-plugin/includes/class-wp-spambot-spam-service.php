@@ -67,10 +67,6 @@ class WP_Spambot_Spam_Service {
             $params['email'] = $user->user_email;
         }
         
-        if (!empty($user->user_login)) {
-            $params['username'] = $user->user_login;
-        }
-        
         if (!empty($this->settings['stopforumspam_api_key'])) {
             $params['api_key'] = $this->settings['stopforumspam_api_key'];
         }
@@ -111,21 +107,12 @@ class WP_Spambot_Spam_Service {
         );
         
         $email_data = isset($data['email']) ? $data['email'] : array();
-        $username_data = isset($data['username']) ? $data['username'] : array();
         
         if (!empty($email_data) && !empty($email_data['appears'])) {
             $details['email'] = array(
                 'frequency' => isset($email_data['frequency']) ? (int) $email_data['frequency'] : 0,
                 'confidence' => isset($email_data['confidence']) ? (float) $email_data['confidence'] : 0,
                 'lastseen' => isset($email_data['lastseen']) ? $email_data['lastseen'] : '',
-            );
-        }
-        
-        if (!empty($username_data) && !empty($username_data['appears'])) {
-            $details['username'] = array(
-                'frequency' => isset($username_data['frequency']) ? (int) $username_data['frequency'] : 0,
-                'confidence' => isset($username_data['confidence']) ? (float) $username_data['confidence'] : 0,
-                'lastseen' => isset($username_data['lastseen']) ? $username_data['lastseen'] : '',
             );
         }
         
@@ -136,7 +123,9 @@ class WP_Spambot_Spam_Service {
                 if ($detail['frequency'] > 0) {
                     if (0 === $threshold || $detail['frequency'] >= $threshold) {
                         $is_spam = true;
-                        $factors[$key] = true;
+                        if (array_key_exists($key, $factors)) {
+                            $factors[$key] = true;
+                        }
                     }
                 }
             }
@@ -151,7 +140,7 @@ class WP_Spambot_Spam_Service {
         );
     }
     
-    public function check_registration_email($email, $username = '') {
+    public function check_registration_email($email) {
         if (empty($email)) {
             return array('allowed' => false, 'error' => __('Email address is required.', 'wp-spambot'));
         }
@@ -165,7 +154,7 @@ class WP_Spambot_Spam_Service {
         }
         
         if (!empty($this->settings['stopforumspam_registration_enabled'])) {
-            $result = $this->check_stopforumspam_registration($email, $username);
+            $result = $this->check_stopforumspam_registration($email);
             if (!$result['allowed']) {
                 return $result;
             }
@@ -174,7 +163,7 @@ class WP_Spambot_Spam_Service {
         return array('allowed' => true, 'error' => '');
     }
     
-    protected function check_stopforumspam_registration($email, $username = '') {
+    protected function check_stopforumspam_registration($email) {
         $api_url = 'https://api.stopforumspam.org/api';
         
         $params = array(
@@ -184,10 +173,6 @@ class WP_Spambot_Spam_Service {
         
         if (!empty($email)) {
             $params['email'] = $email;
-        }
-        
-        if (!empty($username)) {
-            $params['username'] = $username;
         }
         
         if (!empty($this->settings['stopforumspam_api_key'])) {
@@ -248,5 +233,75 @@ class WP_Spambot_Spam_Service {
         }
         
         return false;
+    }
+    
+    public function report_spam_to_stopforumspam($user) {
+        $this->refresh_settings();
+        
+        if (empty($this->settings['stopforumspam_api_key'])) {
+            return array(
+                'success' => false,
+                'message' => __('StopForumSpam API key is required to report spam. Please configure it in the settings.', 'wp-spambot'),
+            );
+        }
+        
+        if (empty($user->user_email)) {
+            return array(
+                'success' => false,
+                'message' => __('User email is required to report spam.', 'wp-spambot'),
+            );
+        }
+        
+        $api_url = 'https://www.stopforumspam.com/add.php';
+        
+        $params = array(
+            'email' => $user->user_email,
+            'api_key' => $this->settings['stopforumspam_api_key'],
+            'evidence' => sprintf(__('Reported from WordPress site: %s', 'wp-spambot'), get_bloginfo('name')),
+            'json' => 1,
+        );
+        
+        $response = wp_remote_post($api_url, array(
+            'timeout' => 10,
+            'body' => $params,
+        ));
+        
+        if (is_wp_error($response)) {
+            return array(
+                'success' => false,
+                'message' => sprintf(__('Error reporting to StopForumSpam: %s', 'wp-spambot'), $response->get_error_message()),
+            );
+        }
+        
+        $response_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        if ($response_code === 200 && is_array($data)) {
+            if (isset($data['success']) && (int) $data['success'] === 1) {
+                return array(
+                    'success' => true,
+                    'message' => __('Successfully reported to StopForumSpam.', 'wp-spambot'),
+                );
+            }
+            if (isset($data['error'])) {
+                return array(
+                    'success' => false,
+                    'message' => sprintf(__('Failed to report to StopForumSpam: %s', 'wp-spambot'), $data['error']),
+                );
+            }
+        }
+        
+        if ($response_code === 200 && (strpos($body, 'success') !== false || strpos($body, 'data submitted successfully') !== false)) {
+            return array(
+                'success' => true,
+                'message' => __('Successfully reported to StopForumSpam.', 'wp-spambot'),
+            );
+        }
+        
+        return array(
+            'success' => false,
+            'message' => sprintf(__('Failed to report to StopForumSpam. Response code: %s', 'wp-spambot'), $response_code),
+        );
     }
 }
