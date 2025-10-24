@@ -25,7 +25,7 @@ class WP_Spambot {
     }
     
     public function validate_registration($errors, $sanitized_user_login, $user_email) {
-        $result = $this->spam_service->check_registration_email($user_email, $sanitized_user_login);
+        $result = $this->spam_service->check_registration_email($user_email);
         if (!$result['allowed'] && !empty($result['error'])) {
             $errors->add('spam_detected', $result['error']);
         }
