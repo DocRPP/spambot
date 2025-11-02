@@ -252,6 +252,9 @@ class WP_Spambot_Admin {
             case 'flag_spam':
                 $this->bulk_flag_spam($user_ids);
                 break;
+            case 'mark_not_spam':
+                $this->bulk_mark_not_spam($user_ids);
+                break;
             case 'delete_users':
                 $this->bulk_delete_users($user_ids);
                 break;
@@ -390,6 +393,49 @@ class WP_Spambot_Admin {
             );
             $this->add_admin_notice($error_message, 'warning');
         }
+    }
+    
+    protected function bulk_mark_not_spam($user_ids) {
+        $updated_count = 0;
+        
+        foreach ($user_ids as $user_id) {
+            $user = get_user_by('id', $user_id);
+            if (!$user) {
+                continue;
+            }
+            
+            // Get existing status to preserve some metadata
+            $existing_status = get_user_meta($user_id, 'wp_spambot_status', true);
+            
+            // Update status to clean
+            update_user_meta($user_id, 'wp_spambot_status', array(
+                'status' => 'clean',
+                'service' => is_array($existing_status) && !empty($existing_status['service']) ? $existing_status['service'] : 'manual',
+                'confidence' => null,
+                'frequency' => null,
+                'details' => array(),
+                'factors' => array('email' => false, 'username' => false),
+                'last_checked' => current_time('mysql'),
+            ));
+            
+            // Mark as not flagged
+            update_user_meta($user_id, 'wp_spambot_is_flagged', 0);
+            update_user_meta($user_id, 'wp_spambot_flag_email', 0);
+            update_user_meta($user_id, 'wp_spambot_flag_username', 0);
+            
+            $updated_count++;
+        }
+        
+        $message = sprintf(
+            _n(
+                '%d user has been marked as not spam.',
+                '%d users have been marked as not spam.',
+                $updated_count,
+                'wp-spambot'
+            ),
+            $updated_count
+        );
+        $this->add_admin_notice($message, 'success');
     }
     
     protected function bulk_delete_users($user_ids) {

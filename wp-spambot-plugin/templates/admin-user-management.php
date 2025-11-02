@@ -98,6 +98,7 @@ if (!function_exists('wp_spambot_sortable_column')) {
                     <option value=""><?php esc_html_e('Bulk Actions', 'wp-spambot'); ?></option>
                     <option value="check_spam"><?php esc_html_e('Check for Spam', 'wp-spambot'); ?></option>
                     <option value="flag_spam"><?php esc_html_e('Flag as Spam', 'wp-spambot'); ?></option>
+                    <option value="mark_not_spam"><?php esc_html_e('Mark as Not Spam', 'wp-spambot'); ?></option>
                     <option value="delete_users"><?php esc_html_e('Delete Users', 'wp-spambot'); ?></option>
                 </select>
                 <input type="submit" class="button action" value="<?php esc_attr_e('Apply', 'wp-spambot'); ?>" />
@@ -246,6 +247,7 @@ if (!function_exists('wp_spambot_sortable_column')) {
                     <option value=""><?php esc_html_e('Bulk Actions', 'wp-spambot'); ?></option>
                     <option value="check_spam"><?php esc_html_e('Check for Spam', 'wp-spambot'); ?></option>
                     <option value="flag_spam"><?php esc_html_e('Flag as Spam', 'wp-spambot'); ?></option>
+                    <option value="mark_not_spam"><?php esc_html_e('Mark as Not Spam', 'wp-spambot'); ?></option>
                     <option value="delete_users"><?php esc_html_e('Delete Users', 'wp-spambot'); ?></option>
                 </select>
                 <input type="submit" class="button action" value="<?php esc_attr_e('Apply', 'wp-spambot'); ?>" />
